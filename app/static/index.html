@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Weather Bot — Dale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="cloud">☁</span> Weather Bot
+    </div>
+    <div class="status">
+      <span id="liveDot" class="dot live"></span>
+      <span id="liveLabel">LIVE</span>
+      <span class="muted">&nbsp;atualizado&nbsp;</span>
+      <span id="updatedAt" class="mono">—</span>
+    </div>
+  </header>
+
+  <section class="row two">
+    <div class="card big mtm">
+      <div class="label">PNL MARK-TO-MARKET (PREÇO ATUAL)</div>
+      <div id="mtmValue" class="value">+$0.00</div>
+      <div id="mtmSub" class="sub">+0.0% sobre $0 — 0 ganhando • 0 perdendo</div>
+    </div>
+    <div class="card big realized">
+      <div class="label">PNL REALIZADO REAL</div>
+      <div id="realizedValue" class="value">$0.00</div>
+      <div id="realizedSub" class="sub">0 trades fechados • 0% win rate</div>
+    </div>
+  </section>
+
+  <section class="row backtest">
+    <div class="card backtest-card">
+      <div class="row split">
+        <div>
+          <div class="label">▣ BACKTEST HISTÓRICO (MESA <span id="btRange">2025-11-03 → 2026-05-01</span>)</div>
+          <div class="row split mt8">
+            <div><div id="btRoi" class="value sm pos">+10.1%</div><div class="muted">ROI MÉDIO</div></div>
+            <div><div id="btPnl" class="value sm pos">$1605</div><div class="muted">PNL BACKTEST</div></div>
+            <div><div id="btTrades" class="value sm">38712</div><div class="muted">TRADES SIMULADOS</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="label">PROJEÇÃO PRA $<span id="btBankroll">242</span> EM <span id="btHorizon">5</span></div>
+          <div id="btProjected" class="value sm pos">~$24.42</div>
+          <div class="muted">esperado por ciclo (24h)</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row four">
+    <div class="card metric"><div class="label">CIDADES ATIVAS</div><div id="mActiveCities" class="value sm">0</div><div id="mCitiesList" class="muted small">—</div></div>
+    <div class="card metric"><div class="label">EDGE MÍNIMO</div><div id="mMinEdge" class="value sm">15%</div><div class="muted small">filtro de entrada</div></div>
+    <div class="card metric"><div class="label">FEES PAGAS (OPEN)</div><div id="mFees" class="value sm">$0.00</div><div class="muted small">5.5% taxa - taker</div></div>
+    <div class="card metric"><div class="label">PRÓX. RESOLUÇÃO</div><div id="mNextResolve" class="value sm">—</div><div class="muted small">primeira posição</div></div>
+  </section>
+
+  <section class="row four risk">
+    <div class="card metric"><div class="label">PNL REAL HOJE</div><div id="rPnlToday" class="value sm neg">$0.00</div></div>
+    <div class="card metric"><div class="label">DAILY LOSS LIMIT</div><div id="rLossLimit" class="value sm">$50</div><div class="muted small">stop no atingir</div></div>
+    <div class="card metric"><div class="label">TAMANHO POR TRADE</div><div id="rTradeSize" class="value sm">$5</div></div>
+    <div class="card metric"><div class="label">EDGE MÍNIMO</div><div id="rMinEdge" class="value sm">15%</div></div>
+  </section>
+
+  <section class="positions">
+    <div class="section-head">
+      <div class="label">POSIÇÕES ABERTAS</div>
+      <div class="muted small"><span id="openCount">0</span> abertas</div>
+    </div>
+    <div id="grid" class="grid"></div>
+  </section>
+
+  <footer class="footer">
+    <span class="muted small">mode=<span id="mode">—</span></span>
+    <span class="muted small">proxy=<span id="proxy">—</span></span>
+    <span class="muted small">owm=<span id="owm">—</span></span>
+    <span class="muted small">wallet=<span id="wallet">—</span></span>
+  </footer>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
