@@ -98,69 +98,10 @@ GET  /api/config             estado da config (mascarado)
 WS   /ws                     eventos: tick, position_opened, ...
 ```
 
-## Modo LIVE (compra real na Polymarket)
-
-> ⚠️ **IRREVERSÍVEL.** Lê isto inteiro antes de tentar.
-
-O executor live usa `py-clob-client`, assina ordens com a sua wallet e posta na
-CLOB. Por design o bot **se recusa a subir em LIVE** sem todas as travas abaixo.
-
-### Pré-requisitos
-
-1. **Rotacione a wallet** — qualquer chave privada que tenha aparecido em chat,
-   commit, log ou screenshot está QUEIMADA. Crie uma carteira nova (Magic.link
-   na própria UI Polymarket, ou hardware wallet) e mova fundos pra ela.
-2. **Gere novas API creds** no painel Polymarket pra essa wallet nova.
-3. Preencha `.env`:
-   ```
-   MODE=live
-   PRIVATE_KEY=<wallet nova, NUNCA exposta>
-   WALLET_ADDRESS=<endereço da wallet nova>
-   FUNDER_ADDRESS=<idem se for proxy wallet, ou EOA>
-   POLY_API_KEY=...
-   POLY_SECRET=...
-   POLY_PASSPHRASE=...
-   SIGNATURE_TYPE=2          # 1 se for EOA, 2 se for proxy wallet (UI Polymarket)
-   MAX_LOT_USD=1.0           # cap por ordem; comece com $0.50–$1.00
-   MIN_EDGE=0.15             # exige 15% de edge sobre o ask
-   LIVE_CONFIRM=I_HAVE_ROTATED_THE_LEAKED_KEY
-   ```
-4. Rode `./run.sh`. Se `LIVE_CONFIRM` faltar, o processo aborta no boot.
-
-### Como ele compra
-
-- Discovery acha mercados de clima ativos (parser cobre `be N°`, `or below`,
-  `or above`, `between A-B°`).
-- Forecast poller pega previsão OWM da cidade pra hora de resolução.
-- Edge engine calcula `P(temp ∈ bucket | forecast)` com `Normal(μ, σ)`.
-- Se `edge ≥ MIN_EDGE` e risk manager aprova, executor:
-  1. Calcula `size = MAX_LOT_USD / price` (notional capado).
-  2. Chama `client.post_order(GTC BUY)` via `py-clob-client`.
-  3. Registra a posição em paper-shadow no DB (pra dashboard mostrar).
-- Mesma arquitetura das ordens que você viu (Buy YES @ 5¢, $0.06–$5).
-
-### Travas de segurança
-
-- `LIVE_CONFIRM` precisa ser exatamente `I_HAVE_ROTATED_THE_LEAKED_KEY`.
-- `MAX_LOT_USD` capa cada ordem (não dá pra estourar acidentalmente).
-- `MAX_OPEN_POSITIONS` capa exposição simultânea.
-- `DAILY_LOSS_LIMIT` para trading se atingir realized loss no dia.
-- Risk manager rejeita duplicar posição mesmo mercado/side.
-
-### Kill switch
-
-```bash
-# para tudo:
-pkill -f "app.main"
-```
-
-(roadmap: endpoint `POST /api/control/flatten` que cancela ordens abertas)
-
 ## Próximos passos
 
-1. ~~Live executor~~ ✓
+1. **Live executor** — integrar `py-clob-client`, assinatura EIP-712, retry/backoff.
 2. **TimescaleDB** — substituir SQLite quando volume de ticks crescer.
 3. **Backtester real** — replay sobre `forecast_snapshots` × `price_ticks`.
 4. **Telegram/Discord** — alertas por evento `signal_taken` / kill-switch.
 5. **Painel de config** — editar `MIN_EDGE`/`TRADE_SIZE` em runtime.
-6. **Cancel/flatten** — endpoint pra cancelar todas as ordens abertas.

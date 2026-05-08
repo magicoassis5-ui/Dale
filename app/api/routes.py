@@ -88,6 +88,7 @@ async def get_summary():
         "win_rate": round(s.win_rate * 100, 0),
         "drawdown": round(s.drawdown, 2),
         "active_cities": len(active_cities),
+        "cities_list": sorted([c for c in active_cities if c]),
         "next_resolve_h": next_resolve_h,
         "now": dt.datetime.now(dt.timezone.utc).isoformat(),
     }
