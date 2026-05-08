@@ -2,28 +2,16 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
-import re
 from dataclasses import dataclass
 from typing import Optional
 
 from ..proxy import make_client
+from .buckets import Bucket, parse_question as parse_bucket_question
 
 logger = logging.getLogger(__name__)
 
 GAMMA = "https://gamma-api.polymarket.com"
 CLOB = "https://clob.polymarket.com"
-
-# regex helpers to parse weather questions
-_TEMP_RE = re.compile(r"(?P<num>-?\d+(?:\.\d+)?)\s*°?\s*(?P<unit>[CFcf])\b")
-_DIR_RE = re.compile(r"\b(at\s*least|or\s*higher|or\s*more|reach|exceed|above|over|≥|>=)\b", re.I)
-_DIR_LE_RE = re.compile(r"\b(at\s*most|or\s*lower|or\s*less|below|under|≤|<=)\b", re.I)
-_CITY_RE = re.compile(
-    r"\bin\s+([A-Z][a-zA-Z\.\-' ]{1,30})", re.UNICODE
-)
-
-
-def _f_to_c(f: float) -> float:
-    return (f - 32.0) * 5.0 / 9.0
 
 
 @dataclass
@@ -35,46 +23,14 @@ class ParsedMarket:
     no_token_id: Optional[str]
     resolves_at: Optional[dt.datetime]
     city: Optional[str]
-    threshold_c: Optional[float]
-    threshold_unit: Optional[str]
-    direction: Optional[str]
-
-
-def parse_question(question: str) -> tuple[Optional[str], Optional[float], Optional[str], Optional[str]]:
-    """Heuristic parse: -> (city, threshold_c, unit, direction)."""
-    if not question:
-        return None, None, None, None
-    city = None
-    m = _CITY_RE.search(question)
-    if m:
-        city = m.group(1).strip().rstrip("?.,")
-
-    tm = _TEMP_RE.search(question)
-    if not tm:
-        return city, None, None, None
-    num = float(tm.group("num"))
-    unit = tm.group("unit").upper()
-    threshold_c = num if unit == "C" else _f_to_c(num)
-
-    direction = None
-    if _DIR_LE_RE.search(question):
-        direction = "lte"
-    elif _DIR_RE.search(question):
-        direction = "gte"
-    else:
-        # default for "Will temperature in X reach Y" style → gte
-        if re.search(r"\b(reach|hit|top|exceed)\b", question, re.I):
-            direction = "gte"
-        else:
-            direction = "gte"
-    return city, threshold_c, unit, direction
+    bucket: Optional[Bucket]
 
 
 async def fetch_active_weather_markets(limit: int = 200) -> list[ParsedMarket]:
     """Polymarket Gamma API does not expose a stable 'weather' tag id, so we
     keyword-filter the active set."""
     out: list[ParsedMarket] = []
-    keywords = ("temperature", "weather", "highest", "warmest", "coldest", "snow", "rain")
+    keywords = ("temperature", "weather", "highest", "warmest", "coldest", "snow", "rain", "°c", "°f")
     try:
         async with make_client(timeout=30) as cx:
             r = await cx.get(
@@ -112,7 +68,9 @@ async def fetch_active_weather_markets(limit: int = 200) -> list[ParsedMarket]:
                 resolves_at = dt.datetime.fromisoformat(end.replace("Z", "+00:00"))
             except Exception:
                 pass
-        city, thr_c, unit, direction = parse_question(q)
+        city, bucket = parse_bucket_question(q)
+        if not bucket:
+            continue
         out.append(ParsedMarket(
             market_id=str(it.get("id") or it.get("conditionId") or it.get("slug")),
             slug=it.get("slug") or "",
@@ -121,9 +79,7 @@ async def fetch_active_weather_markets(limit: int = 200) -> list[ParsedMarket]:
             no_token_id=no_tok,
             resolves_at=resolves_at,
             city=city,
-            threshold_c=thr_c,
-            threshold_unit=unit,
-            direction=direction,
+            bucket=bucket,
         ))
     return out
 

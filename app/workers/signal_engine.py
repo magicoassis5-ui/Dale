@@ -6,7 +6,7 @@ import logging
 from sqlalchemy import select, desc, and_
 
 from ..config import settings
-from ..core.edge import compute_edge
+from ..core.buckets import Bucket, compute_bucket_edge
 from ..core.polymarket import fetch_orderbook
 from ..core.risk import check_can_open
 from ..db import (
@@ -16,7 +16,7 @@ from ..db import (
     get_session_factory,
 )
 from ..events import emit
-from .executor import open_paper_position
+from .executor import open_position
 
 logger = logging.getLogger(__name__)
 
@@ -42,20 +42,24 @@ async def run() -> None:
                     select(Market).where(and_(
                         Market.status == "open",
                         Market.city.is_not(None),
-                        Market.threshold_c.is_not(None),
-                        Market.direction.is_not(None),
                     ))
                 )).scalars().all()
 
                 for m in markets:
+                    if m.bucket_lo_c is None and m.bucket_hi_c is None:
+                        continue
                     fc = await _latest_forecast(s, m.city)
                     if not fc:
                         continue
+                    bucket = Bucket(
+                        lo_c=m.bucket_lo_c,
+                        hi_c=m.bucket_hi_c,
+                        raw_unit=m.threshold_unit or "C",
+                    )
                     yes_book = await fetch_orderbook(m.yes_token_id) if m.yes_token_id else None
                     no_book = await fetch_orderbook(m.no_token_id) if m.no_token_id else None
-                    res = compute_edge(
-                        direction=m.direction,
-                        threshold_c=m.threshold_c,
+                    res = compute_bucket_edge(
+                        bucket=bucket,
                         mu_c=fc.mu_c,
                         sigma_c=fc.sigma_c,
                         yes_ask=yes_book.ask if yes_book else None,
@@ -79,11 +83,13 @@ async def run() -> None:
                     ))
                     await s.commit()
                     if risk.ok:
-                        await open_paper_position(
+                        token_id = m.yes_token_id if res.side == "YES" else m.no_token_id
+                        await open_position(
                             market_id=m.id,
                             side=res.side,
                             price=res.limit_price,
                             edge=res.edge,
+                            token_id=token_id,
                         )
                         emit("signal_taken", market_id=m.id, side=res.side, edge=res.edge)
                     else:

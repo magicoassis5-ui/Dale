@@ -42,6 +42,9 @@ class Market(Base):
     threshold_c: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     threshold_unit: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     direction: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # 'gte'|'lte'
+    bucket_lo_c: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    bucket_hi_c: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    bucket_label: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     resolves_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     yes_token_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     no_token_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)

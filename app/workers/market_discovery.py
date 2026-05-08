@@ -22,30 +22,26 @@ async def run() -> None:
             async with factory() as s:
                 added = 0
                 for m in markets:
-                    existing = (await s.execute(select(Market).where(Market.id == m.market_id))).scalar_one_or_none()
-                    if existing:
-                        existing.question = m.question
-                        existing.yes_token_id = m.yes_token_id
-                        existing.no_token_id = m.no_token_id
-                        existing.resolves_at = m.resolves_at
-                        existing.city = m.city
-                        existing.threshold_c = m.threshold_c
-                        existing.threshold_unit = m.threshold_unit
-                        existing.direction = m.direction
-                        continue
-                    s.add(Market(
-                        id=m.market_id,
-                        slug=m.slug,
+                    b = m.bucket
+                    fields = dict(
                         question=m.question,
-                        city=m.city,
-                        threshold_c=m.threshold_c,
-                        threshold_unit=m.threshold_unit,
-                        direction=m.direction,
-                        resolves_at=m.resolves_at,
                         yes_token_id=m.yes_token_id,
                         no_token_id=m.no_token_id,
-                        status="open",
-                    ))
+                        resolves_at=m.resolves_at,
+                        city=m.city,
+                        bucket_lo_c=(b.lo_c if b else None),
+                        bucket_hi_c=(b.hi_c if b else None),
+                        bucket_label=(b.label() if b else None),
+                        threshold_unit=(b.raw_unit if b else None),
+                        threshold_c=(b.raw_lo if b else None),
+                        direction=("range" if b else None),
+                    )
+                    existing = (await s.execute(select(Market).where(Market.id == m.market_id))).scalar_one_or_none()
+                    if existing:
+                        for k, v in fields.items():
+                            setattr(existing, k, v)
+                        continue
+                    s.add(Market(id=m.market_id, slug=m.slug, status="open", **fields))
                     added += 1
                 await s.commit()
             if added:

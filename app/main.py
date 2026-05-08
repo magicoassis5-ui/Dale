@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -37,12 +38,37 @@ def setup_logging() -> None:
     )
 
 
+def _apply_proxy_env() -> None:
+    """py-clob-client / requests honor HTTP(S)_PROXY env vars."""
+    if settings.proxy_url:
+        os.environ.setdefault("HTTPS_PROXY", settings.proxy_url)
+        os.environ.setdefault("HTTP_PROXY", settings.proxy_url)
+
+
+def _live_preflight() -> None:
+    if settings.mode != "live":
+        return
+    if settings.live_confirm != "I_HAVE_ROTATED_THE_LEAKED_KEY":
+        raise SystemExit(
+            "REFUSING TO START in LIVE mode: set LIVE_CONFIRM=I_HAVE_ROTATED_THE_LEAKED_KEY "
+            "in .env, but ONLY after you have moved funds to a fresh wallet whose private key "
+            "has never been shared in chat/logs."
+        )
+    missing = [k for k in ("private_key", "wallet_address", "poly_api_key", "poly_secret",
+                            "poly_passphrase") if not getattr(settings, k)]
+    if missing:
+        raise SystemExit(f"LIVE missing required env: {missing}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_logging()
     log = logging.getLogger("dale")
-    log.info("starting dale (mode=%s, proxy=%s, owm=%s)",
-             settings.mode, bool(settings.proxy_url), bool(settings.owm_api_key))
+    _apply_proxy_env()
+    _live_preflight()
+    log.info("starting dale (mode=%s, proxy=%s, owm=%s, max_lot=$%.2f)",
+             settings.mode, bool(settings.proxy_url), bool(settings.owm_api_key),
+             settings.max_lot_usd)
     Path("data").mkdir(exist_ok=True)
     await init_db()
 
