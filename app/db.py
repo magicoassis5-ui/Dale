@@ -154,6 +154,13 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 async def init_db() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
+        # WAL mode + busy_timeout: SQLite no Windows com escrita concorrente
+        # de 4 workers gera "database is locked" sem isso.
+        if settings.db_url.startswith("sqlite"):
+            from sqlalchemy import text
+            await conn.execute(text("PRAGMA journal_mode=WAL"))
+            await conn.execute(text("PRAGMA busy_timeout=5000"))
+            await conn.execute(text("PRAGMA synchronous=NORMAL"))
         await conn.run_sync(Base.metadata.create_all)
 
 

@@ -59,6 +59,8 @@ async def run() -> None:
         signals_skipped_edge = 0
         signals_skipped_risk = 0
         markets_checked = 0
+        best_edge = -999.0
+        best_market = ""
 
         try:
             now = dt.datetime.now(dt.timezone.utc)
@@ -104,6 +106,7 @@ async def run() -> None:
                     raw_unit=m.threshold_unit or "C",
                 )
 
+                # Avalia com min_edge=0 pra capturar o melhor edge, decide depois.
                 res = evaluate(
                     bucket=bucket,
                     mu_c=fc.mu_c,
@@ -113,10 +116,14 @@ async def run() -> None:
                     no_ask=no_tick.ask   if no_tick  else None,
                     no_bid=no_tick.bid   if no_tick  else None,
                     hours_to_resolve=hours,
-                    min_edge=settings.min_edge,
+                    min_edge=0.0,
                 )
 
-                if not res:
+                if res and res.edge > best_edge:
+                    best_edge = res.edge
+                    best_market = f"{m.city} {m.bucket_label or ''} ({hours:.1f}h)"
+
+                if not res or res.edge < settings.min_edge:
                     signals_skipped_edge += 1
                     continue
 
@@ -151,10 +158,12 @@ async def run() -> None:
                     signals_skipped_risk += 1
                     emit("signal_skipped", market_id=m.id, reason=risk.reason)
 
+            best_str = (f" | melhor edge: {best_edge*100:+.1f}% em {best_market}"
+                        if best_edge > -999 else "")
             logger.info(
-                "ciclo #%d: %d mercados (%d checados) | %d sinais | %d sem edge | %d risco",
+                "ciclo #%d: %d mercados (%d checados) | %d sinais | %d sem edge | %d risco%s",
                 cycle, len(markets), markets_checked, signals_taken,
-                signals_skipped_edge, signals_skipped_risk,
+                signals_skipped_edge, signals_skipped_risk, best_str,
             )
 
         except Exception as e:
